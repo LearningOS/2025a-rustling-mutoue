@@ -2,7 +2,6 @@
     single linked list merge
     This problem requires you to merge two ordered singly linked lists into one ordered singly linked list
 */
-// I AM NOT DONE
 
 use std::fmt::{self, Display, Formatter};
 use std::ptr::NonNull;
@@ -68,12 +67,10 @@ impl<T> LinkedList<T> {
         }
     }
 
-    pub fn merge(list_a: LinkedList<T>, list_b: LinkedList<T>) -> Self
+    pub fn merge(mut list_a: LinkedList<T>, mut list_b: LinkedList<T>) -> Self
     where
-        T: PartialOrd + Copy,
+        T: PartialOrd,
     {
-        //TODO
-
         if list_a.length == 0 {
             return list_b;
         }
@@ -81,43 +78,56 @@ impl<T> LinkedList<T> {
             return list_a;
         }
 
-        let mut merged_list = Self {
-            length: 0,
-            start: None,
-            end: None,
-        };
+        let mut merged_list = LinkedList::new();
         let mut cursor_a = list_a.start;
         let mut cursor_b = list_b.start;
-        let mut ele_cnt_a = list_a.length;
-        let mut ele_cnt_b = list_b.length;
+        let mut last_node_ptr: Option<NonNull<Node<T>>> = None;
 
-        while ele_cnt_a > 0 && ele_cnt_b > 0 {
-            let value_a = unsafe { (*cursor_a.unwrap().as_ptr()).val };
-            let value_b = unsafe { (*cursor_b.unwrap().as_ptr()).val };
+        while let (Some(ptr_a), Some(ptr_b)) = (cursor_a, cursor_b) {
+            let use_a = unsafe {
+                let val_a = &ptr_a.as_ref().val;
+                let val_b = &ptr_b.as_ref().val;
+                val_a <= val_b
+            };
 
-            if value_a > value_b {
-                merged_list.add(value_b);
-                cursor_b = unsafe { (*cursor_b.unwrap().as_ptr()).next };
-                ele_cnt_b -= 1;
+            let chosen_ptr = if use_a {
+                let tmp_ptr = ptr_a;
+                cursor_a = unsafe { tmp_ptr.as_ref().next };
+                tmp_ptr
             } else {
-                merged_list.add(value_a);
-                cursor_a = unsafe { (*cursor_a.unwrap().as_ptr()).next };
-                ele_cnt_a -= 1;
+                let tmp_ptr = ptr_b;
+                cursor_b = unsafe { tmp_ptr.as_ref().next };
+                tmp_ptr
+            };
+
+            if let Some(mut last) = last_node_ptr {
+                unsafe { last.as_mut().next = Some(chosen_ptr) };
+            } else {
+                merged_list.start = Some(chosen_ptr);
             }
+
+            last_node_ptr = Some(chosen_ptr);
+            merged_list.length += 1;
         }
-        if ele_cnt_a != 0 {
-            unsafe {
-                (*merged_list.end.unwrap().as_ptr()).next = cursor_a;
-                merged_list.end = list_a.end;
-                merged_list.length += ele_cnt_a;
-            }
-        } else if ele_cnt_b != 0 {
-            unsafe {
-                (*merged_list.end.unwrap().as_ptr()).next = cursor_b;
-                merged_list.end = list_b.end;
-                merged_list.length += ele_cnt_b;
-            }
+
+        let remaining = if cursor_a.is_some() {
+            merged_list.end = list_a.end;
+            cursor_a
+        } else {
+            merged_list.end = list_b.end;
+            cursor_b
+        };
+
+        if let Some(mut last) = last_node_ptr {
+            unsafe { last.as_mut().next = remaining };
         }
+
+        merged_list.length = list_a.length + list_b.length;
+
+        list_a.start = None;
+        list_a.end = None;
+        list_b.start = None;
+        list_b.end = None;
 
         merged_list
     }
